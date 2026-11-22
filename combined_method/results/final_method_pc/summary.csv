@@ -1,0 +1,7 @@
+use case,classifier,"original (RF, 1 pass)",final,cases
+DSO 1 LV,tabfm,95.2,98.1,72
+DSO 2 feeder,tabfm,94.2,94.8,72
+DSO 3 phase,tabfm,98.9,99.0,72
+DSO 4 MV,tabfm,95.0 · 28,97.1 · 16,64
+TSO 1,tabfm,99.53 · 102/138 · 11,99.62 · 126/138 · 26,93
+TSO 4,tabfm,89.0 (276/310) · 20,95.8 (297/310) · 33,62
