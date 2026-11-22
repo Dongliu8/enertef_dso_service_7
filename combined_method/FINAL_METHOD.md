@@ -18,26 +18,40 @@ The second pass recomputes, around the first-pass estimate instead of the regist
 
 ## Results (register 80% correct, one month)
 
-Main experiment of each use case: SimBench LV (72 cases) and MV with every MV/LV substation metered (64 cases); Far West ACTIVSg2000 with PMU angles at every bus, σ = 0.1° (93 and 62 configurations). Per-case files: [`results/final_method/`](results/final_method).
+Main experiment of each use case: SimBench LV (72 cases) and MV with every MV/LV substation metered (64 cases); Far West ACTIVSg2000 with PMU angles at every bus, σ = 0.1° (93 and 62 configurations).
 
-| Use case | Metric | Register | Original (RF, 1 pass) | Final, XGBoost | Final, TabFM |
-|---|---|---|---|---|---|
-| DSO 1 · LV topology | % lines in the correct state | 79.8 | 95.1 | **98.1** | 98.1 |
-| DSO 2 · customer → feeder | % customers correct | 79.1 | 94.2 | 94.1 | to run |
-| DSO 3 · customer → phase | % customers correct | 79.1 | 98.9 | 98.9 | to run |
-| DSO 4 · MV open points | % open points found · false openings | 81.5 | 95.0 · 28 | **97.2 · 16** | to run |
-| TSO 1 · 20% of statuses wrong | % correct · out of service found · false "out" | 79.6 | 99.5 · 98/138 · 14 | 99.3 · 117/138 · 45 | to run |
-| TSO 4 · 1 of 5 outages on the wrong branch | % out of service found · false "out" | 80.0 | 90.0 (279/310) · 14 | 93.2 (289/310) · 32 | **96.5 (299/310) · 30** |
+**Final method with TabFM**, laptop run (Intel i7, 16 threads, float32); original and final on the same cases. Per-case files: [`results/final_method_pc/`](results/final_method_pc).
 
-- **DSO 1 and 4:** clear gain. **DSO 2 and 3:** a tie; the original was already at 94–99%.
-- **TSO:** more out-of-service branches are found (+19 and +10 with XGBoost, +20 with TabFM on use case 4) at the cost of 2–3 times more false alarms. In the meshed transmission grid the probability gate held the false alarms back; in the radial DSO it blocked correct corrections. The settings stay the same everywhere.
+| Use case | Metric | Register | Original (RF, 1 pass) | Final, TabFM |
+|---|---|---|---|---|
+| DSO 1 · LV topology | % lines in the correct state | 79.8 | 95.2 | **98.1** |
+| DSO 2 · customer → feeder | % customers correct | 79.1 | 94.2 | **94.8** |
+| DSO 3 · customer → phase | % customers correct | 79.1 | 98.9 | **99.0** |
+| DSO 4 · MV open points | % open points found · false openings | 81.5 | 95.0 · 28 | **97.1 · 16** |
+| TSO 1 · 20% of statuses wrong | % correct · out of service found · false "out" | 79.6 | 99.53 · 102/138 · 11 | **99.62 · 126/138** · 26 |
+| TSO 4 · 1 of 5 outages on the wrong branch | % out of service found · false "out" | 80.0 | 89.0 (276/310) · 20 | **95.8 (297/310)** · 33 |
+
+**Final method with XGBoost**, 2-core cloud run with its own Far West scenarios (so its TSO originals differ slightly). Per-case files: [`results/final_method/`](results/final_method).
+
+| Use case | Original (RF, 1 pass) | Final, XGBoost | Final, TabFM (same run) |
+|---|---|---|---|
+| DSO 1 · LV topology | 95.1 | **98.1** | 98.1 |
+| DSO 2 · customer → feeder | 94.2 | 94.1 | – |
+| DSO 3 · customer → phase | 98.9 | 98.9 | – |
+| DSO 4 · MV open points | 95.0 · 28 | **97.2 · 16** | – |
+| TSO 1 | 99.5 · 98/138 · 14 | 99.3 · 117/138 · 45 | – |
+| TSO 4 | 90.0 (279/310) · 14 | 93.2 (289/310) · 32 | **96.5 (299/310) · 30** |
+
+- **DSO:** clear gains in use cases 1 and 4 with either classifier; in 2 and 3 the original was already at 94–99%, and TabFM adds a little (+0.6 and +0.1) where XGBoost ties.
+- **TSO:** both find more out-of-service branches. TabFM does it with fewer extra false alarms (+15 and +13 against +31 and +18 for XGBoost), so on TSO 1 the share in the correct state also rises. In the meshed transmission grid the probability gate held false alarms back; in the radial DSO it blocked correct corrections. The settings stay the same everywhere.
+- TSO 4 is reproduced across the two runs: +6.8 points on the laptop, +6.5 in the cloud.
 - **Where the gain comes from (DSO 1):**
   - random forest, original settings: 95.14;
   - random forest with the new refinement settings: 97.58;
   - XGBoost instead of the random forest: 97.51;
   - with the neighbourhood features: 98.07.
 
-  The refinement settings and the neighbourhood features matter, not the classifier. TabFM ties with XGBoost on DSO 1 (98.12 vs 98.07, paired 95% interval −0.19 to +0.35). It is clearly better on TSO 4, where the training set is small (62 cases × 108 branches).
+  The refinement settings and the neighbourhood features matter, not the classifier. TabFM ties with XGBoost on DSO 1 (98.12 vs 98.07, paired 95% interval −0.19 to +0.35). It is clearly better on the TSO, where the training set is small (62–93 cases × 108 branches).
 - Original method reproduced in this run: TSO 1 gives 99.46 · 98/138 · 14 against the shipped 99.5 · 97/138 · 12. The scenarios were generated again.
 
 ## Run it

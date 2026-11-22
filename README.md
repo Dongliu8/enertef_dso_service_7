@@ -10,7 +10,25 @@ The repository has three parts.
 | [`combined_method/`](combined_method/) | All four use cases: the random forest of Dong Liu (TU Delft) combined with Variance-Distance Spanning Tree, the power-flow residual and a physics refinement, on SimBench (LV, MV) and on the ACTIVSg2000 Far West transmission area. Code to reproduce every result, the results and the summary ([`RESULTS.md`](combined_method/RESULTS.md)). The final method (XGBoost or TabFM, neighbourhood features, refinement without gate, second pass) is in [`FINAL_METHOD.md`](combined_method/FINAL_METHOD.md). |
 | [`uc3_siamese_method/`](uc3_siamese_method/) | Use case 3 (phase identification): the siamese method of Dong Liu, our implementation from the paper, reported next to the combination. |
 
-## Results at a glance (one month of data, no phase angle)
+## Results of the final method (register 80% correct, one month)
+
+The final method is the same for every use case, DSO and TSO: TabFM (or XGBoost) as the classifier, neighbourhood features, the physics refinement over all lines with a 0.1% minimum gain, and a second pass ([`FINAL_METHOD.md`](combined_method/FINAL_METHOD.md)). It is compared with the original combination: random forest, probability gate 0.05–0.95, 1% minimum gain, one pass. Both run on the same cases; Far West uses PMU angles at every bus (σ = 0.1°).
+
+| Use case | Metric | Register | Original combination | Final method, TabFM |
+|---|---|---|---|---|
+| DSO 1 · LV topology | % lines in the correct state | 79.8 | 95.2 | **98.1** |
+| DSO 2 · customer → feeder | % customers correct | 79.1 | 94.2 | **94.8** |
+| DSO 3 · customer → phase | % customers correct | 79.1 | 98.9 | **99.0** |
+| DSO 4 · MV open points | % open points found · false openings | 81.5 | 95.0 · 28 | **97.1 · 16** |
+| TSO 1 · 20% of statuses wrong (93 configurations) | % correct · out of service found · false "out" | 79.6 | 99.53 · 102/138 · 11 | **99.62 · 126/138** · 26 |
+| TSO 4 · 1 of 5 outages on the wrong branch (62 configurations) | % out of service found · false "out" | 80.0 | 89.0 (276/310) · 20 | **95.8 (297/310)** · 33 |
+
+- Higher on the main metric in all six. Clear gains in the two topology problems of the DSO (LV +2.9, MV +2.1 with 12 fewer false openings); DSO 2 and 3 were already at 94–99%.
+- TSO: 24 and 21 more out-of-service branches found, at the cost of more false alarms (+15 and +13).
+- With XGBoost instead of TabFM the DSO results are the same within 0.7 points (98.1 / 94.1 / 98.9 / 97.2 · 16). On the TSO, XGBoost finds fewer branches for more false alarms (TSO 1: 99.3 · 117/138 · 45 against 99.5 · 98/138 · 14 for the original, on a separate run of the scenarios).
+- TabFM run on a laptop (Intel i7, 16 threads); XGBoost on a 2-core cloud machine (about 7 h). Per-case files: [`combined_method/results/final_method_pc/`](combined_method/results/final_method_pc) (TabFM) and [`combined_method/results/final_method/`](combined_method/results/final_method) (XGBoost).
+
+## Original combination: results at a glance (one month of data, no phase angle)
 
 Share of the network in the right state for documentation 70 / 80 / 90% correct. The combination builds on the random forest of Dong Liu and adds the physics of the network.
 
