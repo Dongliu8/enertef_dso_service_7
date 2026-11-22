@@ -1,7 +1,7 @@
-"""Load the TabFM v1.0.0 classifier (PyTorch, bfloat16, CPU) once per process.
+"""Load the TabFM v1.0.0 classifier (PyTorch, CPU) once per process.
 
-Default: the official loader, which downloads google/tabfm-1.0.0-pytorch from Hugging Face on first use
-(needs about 7 GB of RAM while loading; fine on a 16-32 GB machine).
+Default: the official loader, which downloads google/tabfm-1.0.0-pytorch from Hugging Face on first use,
+in float32 (about 7 GB of RAM; TABFM_DTYPE=bfloat16 for about half).
 Low-memory option: set TABFM_BF16 to a folder with a pre-converted bfloat16 copy (config.json +
 model.safetensors); the weights are then loaded straight into bfloat16 tensors (about 3.3 GB of RAM).
 """
@@ -32,7 +32,10 @@ def load():
     if d and os.path.exists(os.path.join(d, "model.safetensors")):
         return _load_bf16(d)
     from tabfm.src.pytorch.tabfm_v1_0_0 import load as official
-    return official("classification", device="cpu", dtype=torch.bfloat16)
+    # float32 by default: CPUs without native bfloat16 (most laptops) gain nothing from it;
+    # TABFM_DTYPE=bfloat16 halves the memory (about 3.5 GB instead of 7)
+    dt = {"float32": torch.float32, "bfloat16": torch.bfloat16}[os.environ.get("TABFM_DTYPE", "float32")]
+    return official("classification", device="cpu", dtype=dt)
 
 
 def load_cached():

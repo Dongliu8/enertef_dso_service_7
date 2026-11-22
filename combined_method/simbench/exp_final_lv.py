@@ -7,6 +7,7 @@ _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 
 from paths import TOPO, SB_CODE, SB_WORK, FW_CODE, FW_WORK, FW_DATA  # noqa: E402
 import glob
 import os
+import time
 import pickle
 import sys
 
@@ -74,6 +75,24 @@ def make_clf(name):
     raise ValueError(CLF)
 
 
+def folds(X, cols, name, label):
+    """Leave-one-feeder-out probabilities with progress output and a checkpoint per fold (a restart resumes)."""
+    p = np.zeros(len(X)); feeders = list(X.feeder.unique()); tag = label.replace(", ", "_").replace(" ", "")
+    for k, f in enumerate(feeders, 1):
+        tr, te = X.feeder != f, X.feeder == f
+        ck = os.path.join(OUT, f"ckpt_{tag}_{f}.npy")
+        if os.path.exists(ck):
+            p[te.values] = np.load(ck); print(f"[{label}] fold {k}/{len(feeders)} {f}: from checkpoint", flush=True)
+            continue
+        t0 = time.time()
+        print(f"[{label}] fold {k}/{len(feeders)} {f}: train {int(tr.sum())} rows, test {int(te.sum())} rows", flush=True)
+        clf = make_clf(name)
+        clf.fit(X.loc[tr, cols], X.loc[tr, "label"]); p[te.values] = clf.predict_proba(X.loc[te, cols])[:, 1]
+        np.save(ck, p[te.values])
+        print(f"[{label}] fold {k}/{len(feeders)} done in {time.time() - t0:.0f} s", flush=True)
+    return p
+
+
 def probs():
     path = f"{OUT}/probs.pkl"
     if os.path.exists(path):
@@ -89,15 +108,14 @@ def probs():
     for name, cols in (("final", FINAL + EXTRA), ("liu", LIU)):
         if name in P:
             continue
-        p = np.zeros(len(X))
-        for f in X.feeder.unique():
-            tr, te = X.feeder != f, X.feeder == f
-            clf = make_clf(name)
-            clf.fit(X.loc[tr, cols], X.loc[tr, "label"]); p[te.values] = clf.predict_proba(X.loc[te, cols])[:, 1]
-        P[name] = p
+        P[name] = folds(X, cols, name, f"pass 1, {name}")
     if PASS2:                                    # second pass: residual and state around the first-pass tree
         X = X.copy(); X["dJ2"] = 0.0; X["dec_in"] = 0
-        for case, ix in X.groupby("case").indices.items():
+        G = X.groupby("case").indices; t0 = time.time()
+        print(f"[pass 2] residual around the first-pass topology, {len(G)} cases", flush=True)
+        for k, (case, ix) in enumerate(G.items(), 1):
+            if k % 12 == 0:
+                print(f"[pass 2] {k}/{len(G)} cases ({time.time() - t0:.0f} s)", flush=True)
             c = C[case]; edges = list(X.edge.iloc[ix])
             cur = {frozenset(e) for e in L.decode(c["nodes"], c["fixed"], edges, P["final"][ix]).edges()}
             Jf = lambda es: L.resid_J(L.zred(c["nodes"], es, c["par"], c["med"], c["root"]), c["P"], c["Q"], c["V"], None, 0.0025, 1.0)
@@ -106,11 +124,8 @@ def probs():
                 e = frozenset(e)
                 X.iat[i, X.columns.get_loc("dJ2")] = (J0 - Jf(cur ^ {e})) / J0
                 X.iat[i, X.columns.get_loc("dec_in")] = int(e in cur)
-        cols = FINAL + EXTRA + ["dJ2", "dec_in"]; p = np.zeros(len(X))
-        for f in X.feeder.unique():                      # first-pass p are out-of-feeder, so no leakage
-            tr, te = X.feeder != f, X.feeder == f
-            clf = make_clf("final"); clf.fit(X.loc[tr, cols], X.loc[tr, "label"]); p[te.values] = clf.predict_proba(X.loc[te, cols])[:, 1]
-        P["final"] = p
+        cols = FINAL + EXTRA + ["dJ2", "dec_in"]      # first-pass p are out-of-feeder, so no leakage
+        P["final"] = folds(X, cols, "final", "pass 2, final")
     out = (X[["case", "feeder", "edge"]].copy(), P)
     pickle.dump(out, open(path, "wb"))
     return out

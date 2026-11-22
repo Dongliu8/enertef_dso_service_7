@@ -76,8 +76,12 @@ class TabFMZeroShot:
         self.n = int(os.environ.get("TABFM_NEST", "4"))
 
     def fit(self, X, y):
+        import torch
         import tabfm_lowmem
         from tabfm import TabFMClassifier
+        # run_all.py sets OMP_NUM_THREADS=1 for its parallel steps; TabFM is trained in a single step, so let
+        # torch use every core unless TABFM_THREADS says otherwise
+        torch.set_num_threads(int(os.environ.get("TABFM_THREADS", "0")) or os.cpu_count() or 1)
         X = np.asarray(X, float); y = np.asarray(y).astype(int)
         maxn = int(os.environ.get("TABFM_MAXN", "10000"))
         if len(y) > maxn:
@@ -86,12 +90,19 @@ class TabFMZeroShot:
                 ix = np.where(y == c)[0]
                 keep.append(rng.choice(ix, max(1, round(maxn * len(ix) / len(y))), replace=False))
             keep = np.sort(np.concatenate(keep)); X, y = X[keep], y[keep]
+        print(f"  [tabfm] context {len(y)} rows x {X.shape[1]} features, {self.n} ensemble members, "
+              f"{torch.get_num_threads()} threads", flush=True)
         self.m = TabFMClassifier(model=tabfm_lowmem.load_cached(), n_estimators=self.n, random_state=SEED)
         self.m.fit(X, y); self.classes_ = self.m.classes_
         return self
 
     def predict_proba(self, X):
-        return self.m.predict_proba(np.asarray(X, float))
+        import time
+        X = np.asarray(X, float); t0 = time.time()
+        print(f"  [tabfm] predicting {len(X)} rows", flush=True)
+        out = self.m.predict_proba(X)
+        print(f"  [tabfm] predicted {len(X)} rows in {time.time() - t0:.0f} s", flush=True)
+        return out
 
 
 def make(name):

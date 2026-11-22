@@ -55,16 +55,21 @@ python final_table.py --clf xgb_tuned --clf tabfm --out results/final_method
 **TabFM**
 - Install: `pip install git+https://github.com/google-research/tabfm.git` (tested at commit `fbb6655`).
 - The first run downloads `google/tabfm-1.0.0-pytorch` from Hugging Face (about 6 GB).
-- It runs on CPU in bfloat16. It needs about 8 GB of RAM while loading and about 4 GB after; 16 GB or more is comfortable.
-- On a smaller machine, set `TABFM_BF16` to a folder holding a bfloat16 copy (`config.json`, `model.safetensors`), which loads in about 3.3 GB.
+- It runs on CPU in float32 by default, using every core (`TABFM_THREADS` to limit). It needs about 7 GB of RAM; 16 GB or more is comfortable.
+- Less memory: `TABFM_DTYPE=bfloat16` (about half), or `TABFM_BF16` pointing to a folder holding a bfloat16 copy (`config.json`, `model.safetensors`), which loads in about 3.3 GB.
 - `TABFM_NEST` sets the ensemble members (default 4). `TABFM_MAXN` sets the most training rows used as context (default 10000; larger sets are subsampled with stratification).
+- Each fit and prediction prints its size and duration. In DSO use case 1 every fold is saved as a checkpoint, so a restart resumes from the last finished fold.
 - The weights have a non-commercial licence.
 
-**Time**, measured on 2 cores; a laptop with 8+ cores and `--workers 4` is roughly 2–3 times faster:
-- Far West scenarios: about 9 h, once, shared by both classifiers.
-- Original method: about 3 h for DSO and 4 h for TSO.
-- Final method with XGBoost: about 1 h for DSO and 4 h for TSO.
-- With TabFM, use cases 2 and 3 have many more rows (customers × feeders or phases), so prediction is the slow part there.
+**Time**, measured:
+
+| Step | 2-core cloud machine | Laptop, Intel i7, 16 threads, `--workers 4` |
+|---|---|---|
+| Original method, all six (incl. the Far West scenarios, run once) | about 12 h | about 5–6 h |
+| Final method, XGBoost, all six | about 7 h | not measured |
+| Final method, TabFM, DSO 1 / 2 / 3 / 4 | – | about 2 h / 6.5 h / 4.5 h / 1 h |
+
+A TabFM fold costs about 16 min for a 10,000-row context plus about 0.2 s per predicted row on the laptop; use cases 2 and 3 predict up to 12,700 rows per fold, so they are the slow part.
 
 **Windows:** `run_all.py` links shared caches with symbolic links and falls back to copies where links are not allowed. Developer mode avoids the copies.
 

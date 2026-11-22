@@ -20,6 +20,7 @@ customer profiles (PERSONALIZED_PROFILES.md).
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -44,7 +45,8 @@ def env(scenario, **kw):
 
 def run(args, cwd, e, tag=""):
     """Run one step unless its done-marker exists. tag: separates variants that use the same arguments."""
-    out = os.path.join(e["CM_WORK"], "done", tag + "_".join(a.replace("/", "-") for a in args)[:150])
+    # characters not allowed in file names (Windows paths in the arguments) become "-"
+    out = os.path.join(e["CM_WORK"], "done", tag + re.sub(r'[\\/:*?"<>|]', "-", "_".join(args))[:150])
     if os.path.exists(out):
         return
     print("  $", " ".join(args), f"[{os.path.basename(e['CM_WORK'])}]", flush=True)
